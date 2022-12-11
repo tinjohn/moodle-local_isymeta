@@ -89,55 +89,8 @@ if ($mform->is_cancelled()) {
     $redirectto = new moodle_url('/');
     redirect($redirectto);
 } else if ($fromform = $mform->get_data()) {
-    // First of all, check for additional lecturer fields.
-    if ($fromform->additional_lecturer > 0) {
-        $addlect = new stdClass();
-        $addlect->id = $record->id;
-        $addlect->detailslecturer = $fromform->additional_lecturer + $record->detailslecturer;
-        $DB->update_record($tbl, $addlect);
-
-
-        // Add empty fields in ildmeta_additional.
-        // New logic required due to delete options...
-
-        // Get last lecturer id.
-
-        $recordlectlast = $DB->get_record_sql(
-            "SELECT * FROM {ildmeta_additional} WHERE courseid = ? ORDER BY id DESC",
-            array('courseid' => $id)
-        );
-
-        if (!empty($recordlectlast)) {
-            $i = explode("_", $recordlectlast->name)[2] + 1;
-        } else {
-            $i = 1;
-        }
-
-        $maxi = ($i - 1) + $fromform->additional_lecturer;
-
-        while ($i <= $maxi) {
-            $str1 = "lecturer_type_" . $i;
-            $str2 = "detailslecturer_image_" . $i;
-            $str3 = "detailslecturer_editor_" . $i;
-
-            $fields = array($str1, $str2, $str3);
-
-            foreach ($fields as $f) {
-                $ins = new stdClass();
-                $ins->courseid = $id;
-                $ins->name = $f;
-                $ins->value = '';
-                $DB->insert_record($tbllecturer, $ins);
-            }
-            $i++;
-        }
-        // If additional lecturer the user will be redirected to the edit_metadata.php for further editing.
-        $url = new moodle_url('/local/ildmeta/edit_metadata.php', array('id' => $id));
-    } else {
-        // Otherweise he will be forwarded to the detailpage.php.
-        $url = new moodle_url('/blocks/ildmetaselect/detailpage.php', array('id' => $id));
-    }
-
+    // MOVED check for additional lecturer fields - tinjohn 20221211.
+    // Moved directly before redirect because check needs DB id that is not given for new courses.    
 
     $todb = new stdClass;
     $todb->courseid = $id;
@@ -293,6 +246,55 @@ if ($mform->is_cancelled()) {
         }
     }
 
+    // Finally, check for additional lecturer fields.
+    if ($fromform->additional_lecturer > 0) {
+        $addlect = new stdClass();
+        $addlect->id = $record->id;
+        $addlect->detailslecturer = $fromform->additional_lecturer + $record->detailslecturer;
+        $DB->update_record($tbl, $addlect);
+
+
+        // Add empty fields in ildmeta_additional.
+        // New logic required due to delete options...
+
+        // Get last lecturer id.
+
+        $recordlectlast = $DB->get_record_sql(
+            "SELECT * FROM {ildmeta_additional} WHERE courseid = ? ORDER BY id DESC",
+            array('courseid' => $id)
+        );
+
+        if (!empty($recordlectlast)) {
+            $i = explode("_", $recordlectlast->name)[2] + 1;
+        } else {
+            $i = 1;
+        }
+
+        $maxi = ($i - 1) + $fromform->additional_lecturer;
+
+        while ($i <= $maxi) {
+            $str1 = "lecturer_type_" . $i;
+            $str2 = "detailslecturer_image_" . $i;
+            $str3 = "detailslecturer_editor_" . $i;
+
+            $fields = array($str1, $str2, $str3);
+
+            foreach ($fields as $f) {
+                $ins = new stdClass();
+                $ins->courseid = $id;
+                $ins->name = $f;
+                $ins->value = '';
+                $DB->insert_record($tbllecturer, $ins);
+            }
+            $i++;
+        }
+        // If additional lecturer the user will be redirected to the edit_metadata.php for further editing.
+        $url = new moodle_url('/local/ildmeta/edit_metadata.php', array('id' => $id));
+    } else {
+        // Otherweise he will be forwarded to the detailpage.php.
+        $url = new moodle_url('/blocks/ildmetaselect/detailpage.php', array('id' => $id));
+    }
+
     // Redirect to detailpage.
     redirect($url, 'Daten erfolgreich gespeichert', null, \core\output\notification::NOTIFY_SUCCESS);
 } else {
@@ -389,12 +391,10 @@ if ($mform->is_cancelled()) {
 
         $toform->coursetitle = $course->fullname;
         if (isset($course->summary)) {
-          // CHANGED tinjohn 20221208 given array is not valid.
-          // Modified to single string.
-          // Error php 8.0 and Moodle 4.0.4 -> mysqli::real_escape_string(): Argument #1 ($string) must be of type string, array given.
-            $toform->teasertext = $course->summary;
+          // CHANGED tinjohn 20221211. Array again because there will be no DB query.
+            $toform->teasertext['text'] = $course->summary;
         } else {
-            $toform->teasertext = '';
+            $toform->teasertext['text'] = '';
         }
         if (isset($course->startdate)) {
             $toform->starttime = $course->startdate;
@@ -443,13 +443,9 @@ if ($mform->is_cancelled()) {
         $toform->availablefrom = null;
         $toform->availableuntil = null;
 
-	// ADDED tinjohn: should not be written here.
-	// New database entries were written whenever user choose the ILD Meta from menu - not a good happit because it is not deleted when user cancels dialog or just leaves.    
-        $toform->id = $DB->insert_record($tbl, $toform);
-        // ADDED tinjohn 20221208 the array for the form.
-        $fromdbtoformteasertext = $toform->teasertext;
-        $toform->teasertext = array();
-        $toform->teasertext['text'] = $fromdbtoformteasertext;
+	      // REMOVED tinjohn: should not be written here.
+	      // New database entries were written whenever user choose the ILD Meta from menu - not a good happit because it is not deleted when user cancels dialog or just leaves.
+        // $toform->id = $DB->insert_record($tbl, $toform);
     }
 
 
