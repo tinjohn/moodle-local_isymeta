@@ -92,6 +92,7 @@ if ($mform->is_cancelled()) {
 
     $redirectto = new moodle_url('/');
     redirect($redirectto);
+// ADDED Comment tinjiohn 20221214 - else store data IF there were get_data() (post data).
 } else if ($fromform = $mform->get_data()) {
     // MOVED check for additional lecturer fields - tinjohn 20221211.
     // Moved directly before redirect because check needs DB id that is not given for new courses.
@@ -139,7 +140,21 @@ if ($mform->is_cancelled()) {
     $todb->tags = $fromform->tags;
 
 
-    // Bird/DC properties.
+    // inital Bird/DC properties. - they might be disabled, thus are not available in post vars for new courses
+    $todb->exporttobird = 0;
+    $todb->birdsubjectarea = 0;
+    $todb->shortname = $course->shortname;
+    $todb->coursetype = null;
+    $todb->languagelevels = null;
+    $todb->languagesubject = null;
+    $todb->courseformat = null;
+    $todb->selfpaced = 0;
+    $todb->audience = null;
+    $todb->courseprerequisites = null;
+    $todb->availablefrom = null;
+    $todb->availableuntil = null;
+
+    // Bird/DC properties - overwrite from form.
     $todb->exporttobird = $fromform->exporttobird;
     if (isset($fromform->birdsubjectarea)) {
         $todb->birdsubjectarea = $fromform->birdsubjectarea;
@@ -306,13 +321,15 @@ if ($mform->is_cancelled()) {
 
     // Redirect to detailpage.
     redirect($url, 'Daten erfolgreich gespeichert', null, \core\output\notification::NOTIFY_SUCCESS);
+// ADDED COMMENT tinjohn 20221214 - ELSE (there was no data to store) just put the data to form.
+// Try read the date from the ildmetatable.
 } else {
     // Prefill forms from db.
     $getdb = $DB->get_record($tbl, array('courseid' => $id));
 
     $getlect = $DB->get_records($tbllecturer, array('courseid' => $id));
 
-
+    // ADDED tinjohn 20221214 read data if it there are already data in ildmeta table
     if ($getdb != null) {
         $toform = new stdClass;
         $toform->coursetitle = $getdb->coursetitle;
@@ -387,6 +404,7 @@ if ($mform->is_cancelled()) {
             $toform->$lectname = $draftitemid;
         }
     } else {
+    // ADDED tinjohn 20221214 else initialise data with data from course table.
 
         $toform = new stdClass();
         $course = $DB->get_record('course', array('id' => $id), 'fullname, shortname, summary, startdate', MUST_EXIST);
